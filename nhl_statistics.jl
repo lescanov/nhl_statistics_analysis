@@ -5,7 +5,7 @@ NHL statistics were downloaded from moneypuck.com.
 """
 
 # Loading packages
-using Pkg, CSV, DataFrames, DataFramesMeta, Statistics, Gadfly, UMAP, StatsBase
+using Pkg, CSV, DataFrames, DataFramesMeta, Statistics, Gadfly, UMAP, StatsBase, OhMyREPL
 
 # Importing 2018-2019 money puck NHL statistics
 nhl_stats_1819 = CSV.read("2018-2019_skater_statistics.csv", DataFrame)
@@ -239,3 +239,56 @@ plot(
 
 # For this UMAP, since I am testing the efficacy of advanced statistics
 # Perhaps it would be pertinent in removing them prior to clustering.
+
+# Next, I want to do this for all situations and not just 5 v 5
+all_situation_1819 = @chain nhl_stats_1819 begin
+    @subset(:situation .== "all", :games_played .>= 30)
+    @transform(
+        :points_per_game = :I_F_points ./ :games_played,
+        :relative_corsi_percentage = (:onIce_corsiPercentage .- :offIce_corsiPercentage) *100
+    )
+    select(Not([:playerId, :season, :team, :position, :name, :situation, :xGoalsForAfterShifts, :xGoalsAgainstAfterShifts, :corsiForAfterShifts, :corsiAgainstAfterShifts, :fenwickForAfterShifts, :fenwickAgainstAfterShifts]))
+end
+
+# Z-score normalization
+ mapcols!(zscore, all_situation_1819)
+
+# Getting player nhl stats for s
+labels_for_all_situations = @chain nhl_stats_1819 begin
+    @subset(:situation .== "all", :games_played .>= 30)
+    @transform(
+        :points_per_game = :I_F_points ./ :games_played,
+        :relative_corsi_percentage = (:onIce_corsiPercentage .- :offIce_corsiPercentage) *100
+    )
+end
+
+# Perhaps better implementation is a dictionary
+all_situations_umap_model = @chain all_situation_1819 begin
+    permutedims
+    Matrix
+    umap
+    DataFrame(:auto)
+    permutedims
+    rename(:x1 => :UMAP1, :x2 => :UMAP2)
+    @transform(
+        :team = labels_for_all_situations.team,
+        :position = labels_for_all_situations.position,
+        :games_played = labels_for_all_situations.games_played,
+        :relative_corsi_percentage = labels_for_all_situations.relative_corsi_percentage,
+        :points_per_game = labels_for_all_situations.points_per_game
+    )
+end
+
+# Clustering based on games_played
+plot(
+    all_situations_umap_model,
+    x = :UMAP1,
+    y = :UMAP2,
+    color = :games_played,
+    Geom.point
+)
+
+# Turns out that games played really affects this cluster
+# This perhaps highlights the need for some adjusted stats
+# Need to either adjust for game or per 60 output.
+
