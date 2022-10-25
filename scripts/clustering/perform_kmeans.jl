@@ -42,3 +42,6 @@ function perform_optimal_kmeans(input_matrix::Matrix, num_of_k_to_test::Int)
     optimal_kmeans_clusters = assignments(optimal_kmeans_clusters)
     return(optimal_kmeans_clusters)
 end
+
+# End of module
+end
